@@ -1,0 +1,376 @@
+﻿@page "/Game"
+
+@using ProjetoFinal.Models
+@using ProjetoFinal.Services
+@inject MotionService MotionService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="page-container">
+    <div class="glass-card">
+        <div class="game-header">
+            <a href="/" class="back-button">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <h1 class="title">Nível @nivelAtual</h1>
+
+        </div>
+
+        <div class="game-info">
+            <p><i class="fas fa-info-circle"></i> Guie a bola azul até o círculo verde evitando as paredes marrons!</p>
+        </div>
+
+        <div class="time-info">
+            <div class="time-item">
+                <i class="fas fa-clock"></i>
+                <span>Tempo: @currentTime.ToString("F2")s</span>
+            </div>
+            @if (bestTime.HasValue)
+            {
+                <div class="time-item record">
+                    <i class="fas fa-trophy"></i>
+                    <span>Recorde: @bestTime.Value.ToString("F2")s</span>
+                </div>
+            }
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="labirintoCanvas" width="300" height="300"></canvas>
+        </div>
+        
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="error-message">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>@errorMessage</p>
+                <button @onclick="LimparErro" class="clear-error-button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        }
+
+        <div class="debug-info">
+            <div class="position-info">
+                <div class="position-item">
+                    <i class="fas fa-arrows-alt-h"></i>
+                    <span>X: @x.ToString("F2")</span>
+                </div>
+                <div class="position-item">
+                    <i class="fas fa-arrows-alt-v"></i>
+                    <span>Y: @y.ToString("F2")</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private double x, y;
+    private bool isMoving = true;
+    private bool gameReady = false;
+    private string errorMessage = "";
+    private double currentTime = 0;
+    private double? bestTime;
+
+    private int nivelAtual = 1;
+    private bool trocandoNivel = false;
+
+    private readonly SemaphoreSlim _lock = new(1, 1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            MotionService.OnReadingChanged += AtualizarPosicao;
+            MotionService.Start();
+
+            var record = await JS.InvokeAsync<GameRecord?>("getRecord");
+            if (record != null)
+            {
+                bestTime = record.Value.CompletionTime;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro ao inicializar o jogo: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public void UpdateGameTime(double time)
+    {
+        currentTime = time;
+        StateHasChanged();
+    }
+
+
+    private async void AtualizarPosicao(AccelerometerData data)
+    {
+        if (!await _lock.WaitAsync(0)) return;
+
+        try
+        {
+            if (trocandoNivel || !gameReady || !isMoving) return;
+
+            double newX = x + (data.Acceleration.X * -2);
+            double newY = y + (data.Acceleration.Y *  2);
+            newX = Math.Clamp(newX, 0, 280);
+            newY = Math.Clamp(newY, 0, 280);
+
+            var result = await JS.InvokeAsync<GameResult>("updateBall", newX, newY);
+
+            switch (result.status)
+            {
+                case "ok":
+                    x = newX; 
+                    y = newY;
+                    break;
+
+                case "next":
+                    trocandoNivel = true;
+                    nivelAtual++;
+
+                    x = result.start!.Value.x;
+                    y = result.start!.Value.y;
+
+                    trocandoNivel = false;
+                    break;
+
+                case "finished":
+                    isMoving = false;
+                    Nav.NavigateTo("/");
+                    return;
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro ao atualizar posição: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("DotNet.attachReviver", DotNetObjectReference.Create(this));
+            var startPos = await JS.InvokeAsync<StartPosition>("startGame", nivelAtual - 1);
+
+            x = startPos.x;
+            y = startPos.y;
+
+            gameReady = true;
+        }
+    }
+
+    private void LimparErro()
+    {
+        errorMessage = "";
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            MotionService.Stop();
+            MotionService.OnReadingChanged -= AtualizarPosicao;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro ao finalizar: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+}
+
+<style>
+    .page-container {
+        min-height: 100vh;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+        margin: 0;
+        padding: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow-y: auto;
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        width: 90%;
+        max-width: 500px;
+        text-align: center;
+        margin: 2rem auto;
+    }
+
+    .game-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        position: relative;
+    }
+
+    .back-button {
+        position: absolute;
+        left: 0;
+        color: white;
+        font-size: 1.2rem;
+        text-decoration: none;
+        transition: transform 0.2s;
+    }
+
+    .back-button:hover {
+        transform: translateX(-3px);
+        color: white;
+    }
+
+    .title {
+        color: white;
+        font-size: 2rem;
+        font-weight: bold;
+        margin: 0 auto;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .game-info {
+        color: white;
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+
+    .game-info i {
+        margin-right: 0.5rem;
+    }
+
+    .time-info {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-bottom: 1.5rem;
+        color: white;
+        font-size: 1.1rem;
+    }
+
+    .time-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.5rem 1rem;
+        border-radius: 10px;
+    }
+
+    .time-item.record {
+        color: #FFD700;
+    }
+
+    .time-item i {
+        font-size: 1.2rem;
+    }
+
+    .canvas-container {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1rem;
+        border-radius: 15px;
+        margin-bottom: 1.5rem;
+    }
+
+    canvas {
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        max-width: 100%;
+        height: auto;
+    }
+
+    .error-message {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 1.5rem 0;
+        padding: 1rem;
+        background: rgba(255, 59, 48, 0.1);
+        border: 1px solid rgba(255, 59, 48, 0.3);
+        border-radius: 10px;
+        color: white;
+    }
+
+    .error-message i {
+        color: #ff3b30;
+        font-size: 1.2rem;
+    }
+
+    .clear-error-button {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 0.5rem;
+        margin-left: auto;
+        transition: transform 0.2s;
+    }
+
+    .clear-error-button:hover {
+        transform: scale(1.1);
+    }
+
+    .debug-info {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1rem;
+        border-radius: 10px;
+        color: white;
+    }
+
+    .position-info {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+    }
+
+    .position-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .position-item i {
+        opacity: 0.8;
+    }
+
+    @@media (max-width: 768px) {
+        .page-container {
+            padding: 0;
+        }
+
+        .glass-card {
+            margin: 1rem auto;
+            padding: 1.5rem;
+            width: 95%;
+        }
+
+        .title {
+            font-size: 1.5rem;
+        }
+
+        .position-info {
+            gap: 1rem;
+        }
+    }
+</style>

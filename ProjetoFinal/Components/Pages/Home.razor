@@ -1,0 +1,162 @@
+﻿@page "/"
+
+<div class="page-container">
+    <div class="glass-card">
+        <h1 class="title">Labirinto</h1>
+        
+        <div class="game-icon">
+            <i class="fas fa-gamepad"></i>
+        </div>
+
+        <div class="description">
+            <p>
+                Bem-vindo ao jogo do labirinto! Esse aplicativo usa o acelerometro do dispositvo para guiar a bola.
+            </p>
+        </div>
+
+        <div class="instructions">
+            <h2>Como Jogar:</h2>
+            <ul>
+                <li><i class="fas fa-mobile-alt"></i> Incline seu dispositivo para mover a bola</li>
+                <li><i class="fas fa-exclamation-triangle"></i> Evite tocar nas paredes do labirinto</li>
+                <li><i class="fas fa-flag-checkered"></i> Chegue até o final para vencer</li>
+            </ul>
+        </div>
+
+        <a href="/game" class="play-button">
+            <i class="fas fa-play"></i> Começar a Jogar!
+        </a>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        min-height: 100vh;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
+        margin: 0;
+        padding: 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        overflow-y: auto;
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 3rem;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        max-width: 600px;
+        width: 90%;
+        text-align: center;
+        margin: 2rem auto;
+    }
+
+    .title {
+        color: white;
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 2rem;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .game-icon {
+        font-size: 4rem;
+        color: white;
+        margin-bottom: 2rem;
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .description {
+        color: white;
+        font-size: 1.2rem;
+        margin-bottom: 2.5rem;
+        line-height: 1.6;
+    }
+
+    .instructions {
+        text-align: left;
+        margin-bottom: 3rem;
+    }
+
+    .instructions h2 {
+        color: white;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .instructions ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .instructions li {
+        color: white;
+        margin-bottom: 1rem;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .instructions li i {
+        width: 24px;
+    }
+
+    .play-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: white;
+        color: #000DFF;
+        padding: 1rem 2.5rem;
+        border-radius: 50px;
+        font-size: 1.25rem;
+        font-weight: bold;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .play-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        background: #f0f0f0;
+        color: #000DFF;
+    }
+
+    @@keyframes float {
+        0% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+        100% {
+            transform: translateY(0px);
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .glass-card {
+            padding: 2rem;
+        }
+
+        .title {
+            font-size: 2rem;
+        }
+
+        .game-icon {
+            font-size: 3rem;
+        }
+    }
+</style>
